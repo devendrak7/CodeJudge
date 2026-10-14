@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+env/
+venv/
+ENV/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Workspace temp execution files
+workspace/*
+!workspace/.gitkeep
+temp_*
+
+# C++ binaries and object files
+*.exe
+*.o
+*.obj
+*.out
+
+# Pytest & IDE
+.pytest_cache/
+.vscode/
+.idea/
