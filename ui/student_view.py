@@ -6,42 +6,27 @@ import streamlit as st
 from database import db_handler
 from engine import runner
 
-PYTHON_TEMPLATE = """# Write your solution here
-import sys
+PYTHON_TEMPLATE = """import sys
 
-def solve():
-    # Read all input from standard input
-    input_text = sys.stdin.read().split()
-    if not input_text:
-        return
-    
-    # Example parsing:
-    # n = int(input_text[0])
-    # ...
-    # print(answer)
+def main():
+    # Read input from standard input
+    data = sys.stdin.read().split()
+    if data:
+        print("Hello, World!")
 
 if __name__ == '__main__':
-    solve()
+    main()
 """
 
-CPP_TEMPLATE = """// Write your C++ solution here
-#include <iostream>
-#include <vector>
-#include <string>
-
+CPP_TEMPLATE = """#include <iostream>
 using namespace std;
 
 int main() {
-    ios_base::sync_with_stdio(false);
-    cin.tie(NULL);
-
     // Read input from standard input
-    // Example:
-    // int n;
-    // if (cin >> n) {
-    //     cout << n << "\\n";
-    // }
-
+    int x;
+    if (cin >> x) {
+        cout << x << "\\n";
+    }
     return 0;
 }
 """
@@ -222,15 +207,10 @@ def _render_submission_result_card(eval_result: dict) -> None:
                 exp_display = "🔒 [Hidden for Security]"
                 act_display = "🔒 [Output Suppressed]"
             else:
-                inp_display = (res.get("input_data", "") or "").strip()
-                if len(inp_display) > 60:
-                    inp_display = inp_display[:57] + "..."
-                exp_display = (res.get("expected_output", "") or "").strip()
-                if len(exp_display) > 60:
-                    exp_display = exp_display[:57] + "..."
-                act_display = (res.get("actual_output", "") or "").strip()
-                if len(act_display) > 60:
-                    act_display = act_display[:57] + "..."
+                shorten = lambda s: s[:57] + "..." if len(s) > 60 else s
+                inp_display = shorten((res.get("input_data", "") or "").strip())
+                exp_display = shorten((res.get("expected_output", "") or "").strip())
+                act_display = shorten((res.get("actual_output", "") or "").strip())
 
             table_rows.append({
                 "Test": f"Case {idx}" + (" (🔒 Hidden)" if is_hidden else " (Visible)"),

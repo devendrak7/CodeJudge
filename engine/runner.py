@@ -60,16 +60,12 @@ def truncate_output(text: str, max_chars: int = MAX_OUTPUT_CHARS) -> str:
     return text
 
 
-def run_python_test(
-    code_path: str,
-    input_data: str,
-    time_limit_sec: float,
-) -> Dict[str, Any]:
-    """Execute a Python file with stdin input and enforce a time limit."""
+def _run_process(cmd: List[str], input_data: str, time_limit_sec: float) -> Dict[str, Any]:
+    """Execute a process with stdin input, enforce time limits, and capture output."""
     start_time = time.perf_counter()
     try:
         proc = subprocess.run(
-            [sys.executable, "-u", code_path],
+            cmd,
             input=input_data,
             capture_output=True,
             text=True,
@@ -79,10 +75,11 @@ def run_python_test(
         duration_ms = (time.perf_counter() - start_time) * 1000.0
 
         if proc.returncode != 0:
+            err = proc.stderr or f"Process exited with non-zero code {proc.returncode}"
             return {
                 "status": "RUNTIME_ERROR",
                 "actual_output": truncate_output(proc.stdout),
-                "error_message": truncate_output(proc.stderr or f"Process exited with code {proc.returncode}"),
+                "error_message": truncate_output(err),
                 "execution_time_ms": round(duration_ms, 2),
             }
 
@@ -109,6 +106,11 @@ def run_python_test(
             "error_message": str(e),
             "execution_time_ms": round(duration_ms, 2),
         }
+
+
+def run_python_test(code_path: str, input_data: str, time_limit_sec: float) -> Dict[str, Any]:
+    """Execute a Python file with stdin input and enforce a time limit."""
+    return _run_process([sys.executable, "-u", code_path], input_data, time_limit_sec)
 
 
 def compile_cpp(
@@ -135,55 +137,9 @@ def compile_cpp(
         return False, f"Unexpected compilation error: {str(e)}"
 
 
-def run_cpp_test(
-    binary_path: str,
-    input_data: str,
-    time_limit_sec: float,
-) -> Dict[str, Any]:
+def run_cpp_test(binary_path: str, input_data: str, time_limit_sec: float) -> Dict[str, Any]:
     """Execute a compiled C++ binary with stdin input and enforce a time limit."""
-    start_time = time.perf_counter()
-    try:
-        proc = subprocess.run(
-            [binary_path],
-            input=input_data,
-            capture_output=True,
-            text=True,
-            timeout=time_limit_sec,
-            creationflags=CREATE_NO_WINDOW,
-        )
-        duration_ms = (time.perf_counter() - start_time) * 1000.0
-
-        if proc.returncode != 0:
-            return {
-                "status": "RUNTIME_ERROR",
-                "actual_output": truncate_output(proc.stdout),
-                "error_message": truncate_output(proc.stderr or f"Process exited with non-zero exit code: {proc.returncode}"),
-                "execution_time_ms": round(duration_ms, 2),
-            }
-
-        return {
-            "status": "COMPLETED",
-            "actual_output": truncate_output(proc.stdout),
-            "error_message": truncate_output(proc.stderr),
-            "execution_time_ms": round(duration_ms, 2),
-        }
-    except subprocess.TimeoutExpired as e:
-        duration_ms = (time.perf_counter() - start_time) * 1000.0
-        stdout_txt = e.stdout if isinstance(e.stdout, str) else (e.stdout.decode("utf-8", errors="replace") if e.stdout else "")
-        return {
-            "status": "TIMEOUT",
-            "actual_output": truncate_output(stdout_txt),
-            "error_message": f"Time Limit Exceeded (Limit: {time_limit_sec:.2f}s)",
-            "execution_time_ms": round(duration_ms, 2),
-        }
-    except Exception as e:
-        duration_ms = (time.perf_counter() - start_time) * 1000.0
-        return {
-            "status": "RUNTIME_ERROR",
-            "actual_output": "",
-            "error_message": str(e),
-            "execution_time_ms": round(duration_ms, 2),
-        }
+    return _run_process([binary_path], input_data, time_limit_sec)
 
 
 def evaluate_submission(
@@ -212,7 +168,7 @@ def evaluate_submission(
             with open(source_file, "w", encoding="utf-8") as f:
                 f.write(code)
 
-            return _run_test_suite_python(source_file, test_cases, time_limit_sec)
+            return _run_test_suite(run_python_test, source_file, test_cases, time_limit_sec)
 
         else:  # C++
             source_file = os.path.join(temp_dir, "solution.cpp")
@@ -224,9 +180,8 @@ def evaluate_submission(
             if not compiled:
                 # Compilation failed: mark all test cases as COMPILATION_ERROR
                 total_possible = sum(int(tc.get("points", 10)) for tc in test_cases)
-                res_list = []
-                for tc in test_cases:
-                    res_list.append({
+                res_list = [
+                    {
                         "test_case_id": tc.get("id"),
                         "is_hidden": tc.get("is_hidden", 0),
                         "passed": False,
@@ -238,7 +193,9 @@ def evaluate_submission(
                         "expected_output": tc.get("expected_output", ""),
                         "input_data": tc.get("input_data", ""),
                         "error_message": compile_err,
-                    })
+                    }
+                    for tc in test_cases
+                ]
                 return {
                     "score": 0,
                     "max_score": total_possible,
@@ -248,19 +205,20 @@ def evaluate_submission(
                     "results": res_list,
                 }
 
-            return _run_test_suite_cpp(binary_file, test_cases, time_limit_sec)
+            return _run_test_suite(run_cpp_test, binary_file, test_cases, time_limit_sec)
 
     finally:
         # Guarantee cleanup of all temporary artifacts
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def _run_test_suite_python(
-    source_file: str,
+def _run_test_suite(
+    test_runner_fn,
+    target_path: str,
     test_cases: List[Dict[str, Any]],
     time_limit_sec: float,
 ) -> Dict[str, Any]:
-    """Run all test cases against a Python source file."""
+    """Run all test cases against a target executable/script using the provided runner function."""
     total_score = 0
     total_possible = 0
     total_time_ms = 0.0
@@ -275,79 +233,7 @@ def _run_test_suite_python(
         input_data = tc.get("input_data", "")
         expected_output = tc.get("expected_output", "")
 
-        run_res = run_python_test(source_file, input_data, time_limit_sec)
-        total_time_ms += run_res["execution_time_ms"]
-
-        if run_res["status"] == "COMPLETED":
-            if outputs_match(run_res["actual_output"], expected_output):
-                test_passed = True
-                status_str = "PASSED"
-                points_earned = points
-                total_score += points
-            else:
-                test_passed = False
-                status_str = "FAILED"
-                points_earned = 0
-                all_passed = False
-        elif run_res["status"] == "TIMEOUT":
-            test_passed = False
-            status_str = "TIMEOUT"
-            points_earned = 0
-            all_passed = False
-            any_timeout = True
-        else:  # RUNTIME_ERROR
-            test_passed = False
-            status_str = "RUNTIME_ERROR"
-            points_earned = 0
-            all_passed = False
-            any_runtime_err = True
-
-        results.append({
-            "test_case_id": tc.get("id"),
-            "is_hidden": tc.get("is_hidden", 0),
-            "passed": test_passed,
-            "status": status_str,
-            "points_awarded": points_earned,
-            "points_possible": points,
-            "execution_time_ms": run_res["execution_time_ms"],
-            "actual_output": run_res["actual_output"],
-            "expected_output": expected_output,
-            "input_data": input_data,
-            "error_message": run_res["error_message"],
-        })
-
-    overall_status = _determine_overall_status(all_passed, any_timeout, any_runtime_err)
-    return {
-        "score": total_score,
-        "max_score": total_possible,
-        "status": overall_status,
-        "execution_time_ms": round(total_time_ms, 2),
-        "compilation_error": None,
-        "results": results,
-    }
-
-
-def _run_test_suite_cpp(
-    binary_file: str,
-    test_cases: List[Dict[str, Any]],
-    time_limit_sec: float,
-) -> Dict[str, Any]:
-    """Run all test cases against a compiled C++ binary."""
-    total_score = 0
-    total_possible = 0
-    total_time_ms = 0.0
-    all_passed = True
-    any_timeout = False
-    any_runtime_err = False
-    results = []
-
-    for tc in test_cases:
-        points = int(tc.get("points", 10))
-        total_possible += points
-        input_data = tc.get("input_data", "")
-        expected_output = tc.get("expected_output", "")
-
-        run_res = run_cpp_test(binary_file, input_data, time_limit_sec)
+        run_res = test_runner_fn(target_path, input_data, time_limit_sec)
         total_time_ms += run_res["execution_time_ms"]
 
         if run_res["status"] == "COMPLETED":

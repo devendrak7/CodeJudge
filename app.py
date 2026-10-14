@@ -18,38 +18,17 @@ def apply_custom_theme() -> None:
     st.markdown(
         """
         <style>
-        /* Main branding header */
         .brand-header {
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            border: 1px solid #334155;
-            padding: 1.25rem 1.75rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            border: 1px solid #334155; padding: 1.25rem 1.75rem;
+            border-radius: 12px; margin-bottom: 1.5rem;
         }
-        .brand-title {
-            color: #38bdf8;
-            font-size: 1.85rem;
-            font-weight: 800;
-            margin: 0;
-            letter-spacing: -0.025em;
-        }
-        .brand-subtitle {
-            color: #94a3b8;
-            font-size: 0.95rem;
-            margin-top: 0.25rem;
-            margin-bottom: 0;
-        }
+        .brand-title { color: #38bdf8; font-size: 1.85rem; font-weight: 800; margin: 0; }
+        .brand-subtitle { color: #94a3b8; font-size: 0.95rem; margin-top: 0.25rem; margin-bottom: 0; }
         .telemetry-pill {
-            display: inline-block;
-            background-color: #1e293b;
-            color: #38bdf8;
-            font-size: 0.78rem;
-            padding: 0.25rem 0.6rem;
-            border-radius: 9999px;
-            border: 1px solid #334155;
-            margin-right: 0.4rem;
-            margin-top: 0.4rem;
+            display: inline-block; background-color: #1e293b; color: #38bdf8;
+            font-size: 0.78rem; padding: 0.25rem 0.6rem; border-radius: 9999px;
+            border: 1px solid #334155; margin: 0.4rem 0.4rem 0 0;
         }
         </style>
         """,

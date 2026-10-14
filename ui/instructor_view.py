@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import streamlit as st
 from database import db_handler
-from engine import runner
 
 
 def render_instructor_view() -> None:
@@ -15,7 +14,6 @@ def render_instructor_view() -> None:
         "➕ Create Assignment",
         "📂 Manage Assignments",
         "🔍 Inspect Submissions",
-        "🛡️ Engine & Sandbox Architecture",
     ])
 
     with tabs[0]:
@@ -26,9 +24,6 @@ def render_instructor_view() -> None:
 
     with tabs[2]:
         _render_inspect_submissions_tab()
-
-    with tabs[3]:
-        _render_security_architecture_tab()
 
 
 def _render_create_assignment_tab() -> None:
@@ -84,26 +79,6 @@ def _render_create_assignment_tab() -> None:
             if st.button("➖ Remove Last"):
                 st.session_state["test_case_list"].pop()
                 st.rerun()
-
-    # Dry-Run / Reference Solution Verifier
-    with st.expander("🧪 Test Case Dry Run (Verify with Reference Solution)"):
-        st.caption("Verify your test cases by running your reference solution before publishing.")
-        dry_lang = st.selectbox("Dry-Run Language", ["Python", "C++"], key="dry_lang")
-        dry_code = st.text_area("Reference Code", height=150, key="dry_code")
-        if st.button("Run Reference Verification"):
-            if dry_code.strip():
-                dry_res = runner.evaluate_submission(
-                    language=dry_lang.lower(),
-                    code=dry_code,
-                    test_cases=st.session_state["test_case_list"],
-                    time_limit_sec=time_limit,
-                )
-                if dry_res["status"] == "Accepted":
-                    st.success(f"All {len(st.session_state['test_case_list'])} test cases passed with reference code!")
-                else:
-                    st.error(f"Dry run result: {dry_res['status']} ({dry_res['score']}/{dry_res['max_score']} pts)")
-                    if dry_res.get("compilation_error"):
-                        st.code(dry_res["compilation_error"])
 
     st.divider()
     if st.button("💾 Publish Assignment", type="primary", use_container_width=True):
@@ -239,29 +214,3 @@ def _render_inspect_submissions_tab() -> None:
                         "Error": r["error_message"] if r["error_message"] else "-",
                     })
                 st.dataframe(inst_test_rows, use_container_width=True)
-
-
-def _render_security_architecture_tab() -> None:
-    st.subheader("🛡️ Execution Engine & Security Architecture")
-
-    st.markdown("""
-    ### Honest Security Notice: Subprocess vs. Container Sandbox
-
-    > [!WARNING]
-    > **Local Subprocess Sandboxing Boundary**:
-    > In this MVP engine, Python and C++ processes are spawned via Python's standard `subprocess.run` module with strict wall-clock timeouts and pipe buffering.
-    > While execution timeouts safeguard against infinite loops, algorithmic time-limit failures, and runaway output streams, **subprocess timeouts alone DO NOT constitute a fully isolated operating system sandbox**.
-
-    #### What Subprocess Guarantees Provide:
-    - **Wall-Clock Timeouts**: Any program entering an infinite loop (`while(true)`, deep recursion) is forcibly terminated after the configured assignment limit (e.g. 2.0s).
-    - **Output Truncation**: Stdout and Stderr are truncated at 10,000 characters to prevent memory exhaustion from infinite print loops.
-    - **Resource Isolation by File**: Each submission compiles and runs in an ephemeral temporary directory (`tempfile.mkdtemp`) with guaranteed cleanup upon termination.
-    - **Windows Dialog Suppression**: Windows Error Reporting and CRT abort dialogs are disabled via `SetErrorMode` and `CREATE_NO_WINDOW` flags to ensure automated grading runs unattended without modal blocking.
-
-    #### Enterprise Production Roadmap:
-    To safely run arbitrary untrusted user code in a public web deployment, the following sandboxing layers should be introduced:
-    1. **Container Isolation**: Docker/Podman with unprivileged user namespaces and read-only root filesystems.
-    2. **Kernel Sandboxing**: Linux `seccomp-bpf` syscall filtering or Google `gVisor` / `nsjail`.
-    3. **Windows Sandbox / AppContainer**: Windows Job Objects with memory limits (`JOB_OBJECT_LIMIT_JOB_MEMORY`) and restricted tokens.
-    4. **Network Namespace Disconnection**: Completely disabling network adapters (`--network none`) for execution workers.
-    """)

@@ -42,9 +42,9 @@ def init_db(db_path: Optional[str] = None, seed_samples: bool = True) -> None:
 def _seed_initial_data(conn: sqlite3.Connection) -> None:
     """Seed initial demo assignments for presentation and testing."""
     sample_assignments = [
-        {
-            "title": "Sum of Multiples (3 & 5)",
-            "description": (
+        (
+            "Sum of Multiples (3 & 5)",
+            (
                 "### Problem Statement\n"
                 "If we list all natural numbers below 10 that are multiples of 3 or 5, we get 3, 5, 6 and 9. "
                 "The sum of these multiples is 23.\n\n"
@@ -55,18 +55,18 @@ def _seed_initial_data(conn: sqlite3.Connection) -> None:
                 "#### Output Format\n"
                 "A single integer representing the sum."
             ),
-            "time_limit": 2.0,
-            "test_cases": [
-                {"input_data": "10\n", "expected_output": "23", "is_hidden": 0, "points": 20},
-                {"input_data": "20\n", "expected_output": "78", "is_hidden": 0, "points": 20},
-                {"input_data": "1\n", "expected_output": "0", "is_hidden": 1, "points": 10},
-                {"input_data": "100\n", "expected_output": "2318", "is_hidden": 1, "points": 25},
-                {"input_data": "1000\n", "expected_output": "233168", "is_hidden": 1, "points": 25},
+            2.0,
+            [
+                ("10\n", "23", 0, 20),
+                ("20\n", "78", 0, 20),
+                ("1\n", "0", 1, 10),
+                ("100\n", "2318", 1, 25),
+                ("1000\n", "233168", 1, 25),
             ],
-        },
-        {
-            "title": "Strict Palindrome Checker",
-            "description": (
+        ),
+        (
+            "Strict Palindrome Checker",
+            (
                 "### Problem Statement\n"
                 "Given a single-line string, determine whether it reads the exact same forwards and backwards "
                 "(case-sensitive, including spaces and symbols).\n\n"
@@ -76,17 +76,17 @@ def _seed_initial_data(conn: sqlite3.Connection) -> None:
                 "#### Output Format\n"
                 "`YES` or `NO` (all uppercase)."
             ),
-            "time_limit": 1.5,
-            "test_cases": [
-                {"input_data": "racecar\n", "expected_output": "YES", "is_hidden": 0, "points": 25},
-                {"input_data": "Hello World\n", "expected_output": "NO", "is_hidden": 0, "points": 25},
-                {"input_data": "radar\n", "expected_output": "YES", "is_hidden": 1, "points": 25},
-                {"input_data": "kayak\n", "expected_output": "YES", "is_hidden": 1, "points": 25},
+            1.5,
+            [
+                ("racecar\n", "YES", 0, 25),
+                ("Hello World\n", "NO", 0, 25),
+                ("radar\n", "YES", 1, 25),
+                ("kayak\n", "YES", 1, 25),
             ],
-        },
-        {
-            "title": "Reverse Array / Sequence",
-            "description": (
+        ),
+        (
+            "Reverse Array / Sequence",
+            (
                 "### Problem Statement\n"
                 "Read an integer `N`, followed by `N` space-separated integers on the next line. "
                 "Output the numbers in reversed order, separated by single spaces.\n\n"
@@ -96,34 +96,28 @@ def _seed_initial_data(conn: sqlite3.Connection) -> None:
                 "#### Output Format\n"
                 "The reversed sequence separated by spaces."
             ),
-            "time_limit": 2.0,
-            "test_cases": [
-                {"input_data": "4\n1 2 3 4\n", "expected_output": "4 3 2 1", "is_hidden": 0, "points": 30},
-                {"input_data": "1\n99\n", "expected_output": "99", "is_hidden": 0, "points": 20},
-                {"input_data": "5\n10 20 30 40 50\n", "expected_output": "50 40 30 20 10", "is_hidden": 1, "points": 25},
-                {"input_data": "3\n-5 0 5\n", "expected_output": "5 0 -5", "is_hidden": 1, "points": 25},
+            2.0,
+            [
+                ("4\n1 2 3 4\n", "4 3 2 1", 0, 30),
+                ("1\n99\n", "99", 0, 20),
+                ("5\n10 20 30 40 50\n", "50 40 30 20 10", 1, 25),
+                ("3\n-5 0 5\n", "5 0 -5", 1, 25),
             ],
-        },
+        ),
     ]
 
     cursor = conn.cursor()
-    for item in sample_assignments:
+    for title, desc, limit, test_cases in sample_assignments:
         cursor.execute(
             "INSERT INTO assignments (title, description, time_limit) VALUES (?, ?, ?)",
-            (item["title"], item["description"], item["time_limit"]),
+            (title, desc, limit),
         )
         assignment_id = cursor.lastrowid
-        for tc in item["test_cases"]:
+        for inp, exp, hidden, pts in test_cases:
             cursor.execute(
                 "INSERT INTO test_cases (assignment_id, input_data, expected_output, is_hidden, points) "
                 "VALUES (?, ?, ?, ?, ?)",
-                (
-                    assignment_id,
-                    tc["input_data"],
-                    tc["expected_output"],
-                    tc["is_hidden"],
-                    tc["points"],
-                ),
+                (assignment_id, inp, exp, hidden, pts),
             )
     conn.commit()
 
@@ -163,8 +157,11 @@ def create_assignment(
         conn.close()
 
 
-def get_assignments(db_path: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Retrieve all assignments with total test count and maximum possible points."""
+def get_assignments(
+    assignment_id: Optional[int] = None,
+    db_path: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Retrieve all assignments or a single assignment by ID."""
     conn = get_connection(db_path)
     try:
         cursor = conn.cursor()
@@ -179,10 +176,14 @@ def get_assignments(db_path: Optional[str] = None) -> List[Dict[str, Any]]:
                 COALESCE(SUM(tc.points), 0) as max_points
             FROM assignments a
             LEFT JOIN test_cases tc ON a.id = tc.assignment_id
-            GROUP BY a.id
-            ORDER BY a.id ASC
         """
-        cursor.execute(query)
+        params: List[Any] = []
+        if assignment_id is not None:
+            query += " WHERE a.id = ?"
+            params.append(assignment_id)
+
+        query += " GROUP BY a.id ORDER BY a.id ASC"
+        cursor.execute(query, params)
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -191,30 +192,8 @@ def get_assignments(db_path: Optional[str] = None) -> List[Dict[str, Any]]:
 
 def get_assignment(assignment_id: int, db_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Retrieve a single assignment by ID."""
-    conn = get_connection(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT 
-                a.id, 
-                a.title, 
-                a.description, 
-                a.time_limit, 
-                a.created_at,
-                COUNT(tc.id) as total_tests,
-                COALESCE(SUM(tc.points), 0) as max_points
-            FROM assignments a
-            LEFT JOIN test_cases tc ON a.id = tc.assignment_id
-            WHERE a.id = ?
-            GROUP BY a.id
-            """,
-            (assignment_id,),
-        )
-        row = cursor.fetchone()
-        return dict(row) if row else None
-    finally:
-        conn.close()
+    rows = get_assignments(assignment_id=assignment_id, db_path=db_path)
+    return rows[0] if rows else None
 
 
 def delete_assignment(assignment_id: int, db_path: Optional[str] = None) -> bool:
@@ -242,18 +221,14 @@ def get_test_cases(
     conn = get_connection(db_path)
     try:
         cursor = conn.cursor()
-        if include_hidden:
-            cursor.execute(
-                "SELECT id, assignment_id, input_data, expected_output, is_hidden, points "
-                "FROM test_cases WHERE assignment_id = ? ORDER BY id ASC",
-                (assignment_id,),
-            )
-        else:
-            cursor.execute(
-                "SELECT id, assignment_id, input_data, expected_output, is_hidden, points "
-                "FROM test_cases WHERE assignment_id = ? AND is_hidden = 0 ORDER BY id ASC",
-                (assignment_id,),
-            )
+        query = (
+            "SELECT id, assignment_id, input_data, expected_output, is_hidden, points "
+            "FROM test_cases WHERE assignment_id = ?"
+        )
+        if not include_hidden:
+            query += " AND is_hidden = 0"
+        query += " ORDER BY id ASC"
+        cursor.execute(query, (assignment_id,))
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -322,10 +297,11 @@ def save_submission(
 def get_submissions(
     assignment_id: Optional[int] = None,
     student_name: Optional[str] = None,
-    limit: int = 100,
+    limit: Optional[int] = 100,
+    order_asc: bool = False,
     db_path: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Retrieve submissions with optional filters."""
+    """Retrieve submissions with optional filters and sorting."""
     conn = get_connection(db_path)
     try:
         cursor = conn.cursor()
@@ -353,8 +329,11 @@ def get_submissions(
             query += " AND LOWER(s.student_name) = LOWER(?)"
             params.append(student_name.strip())
 
-        query += " ORDER BY s.submitted_at DESC, s.id DESC LIMIT ?"
-        params.append(limit)
+        order_by = "ORDER BY s.submitted_at ASC, s.id ASC" if order_asc else "ORDER BY s.submitted_at DESC, s.id DESC"
+        query += f" {order_by}"
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
 
         cursor.execute(query, params)
         rows = cursor.fetchall()
@@ -507,29 +486,5 @@ def get_all_submissions_raw(
     assignment_id: Optional[int] = None,
     db_path: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Retrieve raw submission data for analytics."""
-    conn = get_connection(db_path)
-    try:
-        cursor = conn.cursor()
-        query = """
-            SELECT 
-                s.id,
-                s.assignment_id,
-                a.title as assignment_title,
-                s.student_name,
-                s.language,
-                s.score,
-                s.max_score,
-                s.status,
-                s.execution_time_ms,
-                s.submitted_at
-            FROM submissions s
-            JOIN assignments a ON s.assignment_id = a.id
-            WHERE (? IS NULL OR s.assignment_id = ?)
-            ORDER BY s.submitted_at ASC
-        """
-        cursor.execute(query, (assignment_id, assignment_id))
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-    finally:
-        conn.close()
+    """Retrieve raw submission data for analytics in chronological order (preserved wrapper)."""
+    return get_submissions(assignment_id=assignment_id, limit=None, order_asc=True, db_path=db_path)

@@ -88,19 +88,13 @@ def render_leaderboard_view() -> None:
 
         with col_c1:
             st.markdown("##### 📈 Score Distribution")
-            fig, ax = plt.subplots(figsize=(6, 3.5))
-            fig.patch.set_facecolor("#0E1117")
-            ax.set_facecolor("#161B22")
-
-            # Histogram of scores
+            fig, ax = plt.subplots(figsize=(5.5, 3.2))
+            _apply_dark_theme(fig, ax)
             ax.hist(df["score"], bins=10, color="#38bdf8", edgecolor="#0f172a", alpha=0.85)
             ax.set_title("Submission Score Distribution", color="#e2e8f0", fontsize=11, fontweight="bold")
             ax.set_xlabel("Score Earned", color="#94a3b8")
-            ax.set_ylabel("Count of Submissions", color="#94a3b8")
-            ax.tick_params(colors="#94a3b8")
+            ax.set_ylabel("Count", color="#94a3b8")
             ax.grid(True, linestyle="--", alpha=0.2, color="#94a3b8")
-            for spine in ax.spines.values():
-                spine.set_color("#334155")
             plt.tight_layout()
             st.pyplot(fig)
             plt.close(fig)
@@ -108,7 +102,7 @@ def render_leaderboard_view() -> None:
         with col_c2:
             st.markdown("##### 🎯 Verdict Breakdown")
             status_counts = df["status"].value_counts()
-            fig, ax = plt.subplots(figsize=(6, 3.5))
+            fig, ax = plt.subplots(figsize=(5.5, 3.2))
             fig.patch.set_facecolor("#0E1117")
             ax.set_facecolor("#161B22")
 
@@ -138,72 +132,6 @@ def render_leaderboard_view() -> None:
             st.pyplot(fig)
             plt.close(fig)
 
-        col_c3, col_c4 = st.columns(2)
-
-        with col_c3:
-            st.markdown("##### 💻 Language Breakdown")
-            lang_counts = df["language"].value_counts()
-            fig, ax = plt.subplots(figsize=(6, 3.5))
-            fig.patch.set_facecolor("#0E1117")
-            ax.set_facecolor("#161B22")
-
-            bars = ax.bar(
-                [l.upper() for l in lang_counts.index],
-                lang_counts.values,
-                color=["#60a5fa", "#f43f5e"][:len(lang_counts)],
-                edgecolor="#0f172a",
-                width=0.4,
-            )
-            ax.set_title("Submissions by Language", color="#e2e8f0", fontsize=11, fontweight="bold")
-            ax.set_ylabel("Submissions", color="#94a3b8")
-            ax.tick_params(colors="#94a3b8")
-            ax.grid(axis="y", linestyle="--", alpha=0.2, color="#94a3b8")
-            for spine in ax.spines.values():
-                spine.set_color("#334155")
-            for bar in bars:
-                height = bar.get_height()
-                ax.annotate(f"{height}", xy=(bar.get_x() + bar.get_width() / 2, height),
-                            xytext=(0, 3), textcoords="offset points", ha="center", va="bottom", color="#e2e8f0")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close(fig)
-
-        with col_c4:
-            st.markdown("##### ⏱️ Execution Time (ms) by Language")
-            fig, ax = plt.subplots(figsize=(6, 3.5))
-            fig.patch.set_facecolor("#0E1117")
-            ax.set_facecolor("#161B22")
-
-            py_times = df[df["language"] == "python"]["execution_time_ms"]
-            cpp_times = df[df["language"] == "cpp"]["execution_time_ms"]
-
-            data_to_plot = []
-            labels = []
-            if not py_times.empty:
-                data_to_plot.append(py_times.values)
-                labels.append("Python")
-            if not cpp_times.empty:
-                data_to_plot.append(cpp_times.values)
-                labels.append("C++")
-
-            if data_to_plot:
-                box = ax.boxplot(
-                    data_to_plot,
-                    tick_labels=labels,
-                    patch_artist=True,
-                    boxprops=dict(facecolor="#38bdf8", color="#0284c7"),
-                    medianprops=dict(color="#f97316", linewidth=2),
-                )
-            ax.set_title("Runtime Comparison (ms)", color="#e2e8f0", fontsize=11, fontweight="bold")
-            ax.set_ylabel("Milliseconds", color="#94a3b8")
-            ax.tick_params(colors="#94a3b8")
-            ax.grid(True, linestyle="--", alpha=0.2, color="#94a3b8")
-            for spine in ax.spines.values():
-                spine.set_color("#334155")
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close(fig)
-
         # 6. CSV Export
         st.divider()
         st.subheader("📥 Export Submission Records")
@@ -216,3 +144,12 @@ def render_leaderboard_view() -> None:
             mime="text/csv",
             use_container_width=True,
         )
+
+
+def _apply_dark_theme(fig, ax):
+    """Apply consistent dark styling to Matplotlib charts."""
+    fig.patch.set_facecolor("#0E1117")
+    ax.set_facecolor("#161B22")
+    ax.tick_params(colors="#94a3b8")
+    for spine in ax.spines.values():
+        spine.set_color("#334155")
